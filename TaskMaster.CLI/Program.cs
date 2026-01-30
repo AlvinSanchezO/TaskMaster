@@ -1,10 +1,19 @@
-﻿// 1. Esta línea es VITAL para conectar las carpetas
-using TaskMaster.CLI.Models;
+﻿using TaskMaster.CLI.Models;
+using TaskMaster.CLI.Repositories;
 
-Console.WriteLine("=== Testing TaskMaster Model ===");
+// 1. Initialize the repository
+var repository = new TaskRepository();
 
-// 2. Ahora sí puedes instanciar la clase
-var myTask = new TaskItem("Finish Ticket 002", "Models and Enums implemented");
+// 2. Create and add some tasks
+repository.AddTask(new TaskItem("Setup Project", "Complete Ticket #001"));
+repository.AddTask(new TaskItem("Create Models", "Complete Ticket #002"));
+repository.AddTask(new TaskItem("Build Repository", "Working on Ticket #003"));
 
-// 3. Gracias a tu Override, esto imprimirá los datos limpios
-Console.WriteLine(myTask);
+// 3. Retrieve and list all tasks
+Console.WriteLine("--- Current Tasks in Repository ---");
+var allTasks = repository.GetAllTasks();
+
+foreach (var task in allTasks)
+{
+    Console.WriteLine(task);
+}
