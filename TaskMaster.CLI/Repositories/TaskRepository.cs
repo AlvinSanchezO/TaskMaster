@@ -45,4 +45,17 @@ public class TaskRepository
             _tasks = new List<TaskItem>();
         }
     }
+
+    public bool UpdateTaskStatus(string partialId, Models.TaskStatus newStatus)
+    {
+        //Buscamos la tarea por su ID 
+        var task = _tasks.FirstOrDefault(t => t.Id.ToString().StartsWith(partialId));
+        if (task != null)
+        {
+            task.Status = newStatus;
+            SaveToFile();
+            return true;
+        }
+        return false;
+    }
 }
