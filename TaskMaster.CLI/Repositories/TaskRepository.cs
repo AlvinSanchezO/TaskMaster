@@ -5,7 +5,7 @@ namespace TaskMaster.CLI.Repositories;
 
 public class TaskRepository
 {
-    private const string FilePath = "tasks.json";
+    private const string FilePath = "/data/tasks.json";
     private List<TaskItem> _tasks = new();
 
     public TaskRepository()
