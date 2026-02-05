@@ -58,4 +58,20 @@ public class TaskRepository
         }
         return false;
     }
+
+    public bool DeleteTask(string partialId)
+    {
+        //LINQ find and remove
+        var taskToRemove = _tasks.FirstOrDefault(task => task.Id.ToString().StartsWith(partialId));
+
+        if (taskToRemove != null)
+        {
+            _tasks.Remove(taskToRemove);
+
+            //Update the JSON
+            SaveToFile();
+            return true;
+        }
+        return false;
+    }
 }

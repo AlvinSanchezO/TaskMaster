@@ -109,5 +109,26 @@ while (true)
         default:
             Console.WriteLine("Unknown command. Try: add, list, complete, or exit.");
             break;
+
+        case "delete":
+        {
+            Console.Write("Enter the ID of the task to delete: ");
+            string idToDelete = Console.ReadLine() ?? "";
+
+            if (string.IsNullOrWhiteSpace(idToDelete)) break;
+
+            //Confirm result 
+            if (repository.DeleteTask(idToDelete)) 
+            {
+                Console.ForegroundColor =ConsoleColor.Red;
+                Console.WriteLine("Task deleted successfully! ");
+                Console.ResetColor();
+            }
+            else
+            {
+                Console.WriteLine($"Error: Task with ID starting with '{idToDelete}' not found.");
+            }    
+            break;
+        }    
     }
 }
