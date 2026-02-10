@@ -1,19 +1,21 @@
-﻿# Use the official .NET SDK image to build the app
+﻿# 1. Etapa de compilación
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
-WORKDIR /app
+WORKDIR /src
 
-# Copy the project file and restore dependencies
-COPY *.csproj ./
-RUN dotnet restore
+# Copiamos solo el proyecto para restaurar
+COPY TaskMaster.CLI/TaskMaster.CLI.csproj TaskMaster.CLI/
+RUN dotnet restore "TaskMaster.CLI/TaskMaster.CLI.csproj"
 
-# Copy the remaining files and build the app
-COPY . ./
-RUN dotnet publish -c Release -o out
+# Copiamos el resto del código
+COPY . .
 
-#Use the runtime image for the final stage
+# Nos movemos a la carpeta del proyecto y publicamos
+WORKDIR "/src/TaskMaster.CLI"
+RUN dotnet publish "TaskMaster.CLI.csproj" -c Release -o /app/out
+
+# 2. Etapa de ejecución
 FROM mcr.microsoft.com/dotnet/runtime:9.0
 WORKDIR /app
 COPY --from=build /app/out .
 
-#Define the entry point for the container
 ENTRYPOINT ["dotnet", "TaskMaster.CLI.dll"]
