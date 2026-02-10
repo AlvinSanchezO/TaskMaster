@@ -1,0 +1,29 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: taskmaster-db
+    restart: always
+    environment:
+      POSTGRES_USER: alvin_user
+      POSTGRES_PASSWORD: your_secure_password
+      POSTGRES_DB: taskmaster_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  app:
+    build:
+      context: .
+      dockerfile: TaskMaster.CLI/Dockerfile
+    container_name: taskmaster-app
+    depends_on:
+      - db
+    environment:
+      - ConnectionStrings__DefaultConnection=Host=db;Database=taskmaster_db;Username=alvin_user;Password=your_secure_password
+    stdin_open: true
+    tty: true
