@@ -15,8 +15,9 @@ namespace TaskMaster.CLI.Data
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
-            //No localhost. Docker compose will create a network and the hostname will be the name of the service defined in the docker-compose.yml file
-            var connectionString = "Host=postgres;Port=5432;Database=taskmasterdb;Username=postgres;Password=postgres";
+            // Usamos 'localhost' porque estás ejecutando el comando desde Windows
+            // Los datos coinciden exactamente con tu archivo YAML
+            var connectionString = "Host=localhost;Port=5433;Database=taskmaster_db;Username=alvin_user;Password=password123";
 
             optionsBuilder.UseNpgsql(connectionString);
         }
