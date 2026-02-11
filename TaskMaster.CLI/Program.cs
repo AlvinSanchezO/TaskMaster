@@ -1,8 +1,12 @@
 ﻿using TaskMaster.CLI.Models;
 using TaskMaster.CLI.Repositories;
+using TaskMaster.CLI.Data;
+
+//Initialize our context
+using var context = new AppDbContext();
 
 // Initialize our database
-var repository = new TaskRepository();
+var repository = new TaskRepository(context);
 
 Console.WriteLine("Welcome to TaskMaster CLI");
 Console.WriteLine("Commands: add | list | complete | exit");
@@ -93,42 +97,34 @@ while (true)
             break;
 
         case "complete":
-            Console.Write("Enter Task ID (or first few characters): ");
+            Console.Write("Enter Task ID (full or short): ");
             string idInput = Console.ReadLine() ?? "";
 
+            // Ya no parseamos a Guid aquí, el repositorio se encarga
             if (repository.UpdateTaskStatus(idInput, TaskMaster.CLI.Models.TaskStatus.Completed))
             {
                 Console.WriteLine("Task marked as Completed!");
             }
             else
             {
-                Console.WriteLine("Task not found with that ID.");
+                Console.WriteLine("Task not found.");
             }
             break;
 
-        default:
-            Console.WriteLine("Unknown command. Try: add, list, complete, or exit.");
-            break;
-
         case "delete":
-        {
-            Console.Write("Enter the ID of the task to delete: ");
+            Console.Write("Enter the ID of the task to delete (full or short): ");
             string idToDelete = Console.ReadLine() ?? "";
 
-            if (string.IsNullOrWhiteSpace(idToDelete)) break;
-
-            //Confirm result 
-            if (repository.DeleteTask(idToDelete)) 
+            if (repository.DeleteTask(idToDelete))
             {
-                Console.ForegroundColor =ConsoleColor.Red;
-                Console.WriteLine("Task deleted successfully! ");
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("Task deleted successfully!");
                 Console.ResetColor();
             }
             else
             {
-                Console.WriteLine($"Error: Task with ID starting with '{idToDelete}' not found.");
-            }    
+                Console.WriteLine("Task not found.");
+            }
             break;
-        }    
     }
 }

@@ -1,77 +1,65 @@
-﻿using System.Text.Json;
-using TaskMaster.CLI.Models;
+﻿using TaskMaster.CLI.Models;
+using TaskMaster.CLI.Data;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace TaskMaster.CLI.Repositories;
 
 public class TaskRepository
 {
-    private const string FilePath = "/data/tasks.json";
-    private List<TaskItem> _tasks = new();
+    private readonly AppDbContext _context;
 
-    public TaskRepository()
+    public TaskRepository(AppDbContext context)
     {
-        // Al iniciar el repositorio, intentamos cargar lo que haya en el disco
-        LoadFromFile();
+        _context = context;
     }
 
     public void AddTask(TaskItem task)
     {
-        _tasks.Add(task);
-        SaveToFile(); // Guardamos automáticamente al añadir
+        _context.Tasks.Add(task);
+        _context.SaveChanges(); // INSERT ef core 
     }
 
-    public IEnumerable<TaskItem> GetAllTasks() => _tasks;
-
-    private void SaveToFile()
+    public List<TaskItem> GetAllTasks()
     {
-        // JsonSerializerOptions hace que el JSON se vea ordenado (con sangría)
-        var options = new JsonSerializerOptions { WriteIndented = true };
-        string jsonString = JsonSerializer.Serialize(_tasks, options);
-        File.WriteAllText(FilePath, jsonString);
+        return _context.Tasks.OrderBy(t => t.CreatedAt).ToList();
     }
 
-    private void LoadFromFile()
+    // Método auxiliar para buscar por ID completo o parcial
+    private TaskItem? GetTaskByIdOrPartial(string idInput)
     {
-        if (!File.Exists(FilePath)) return;
+        // Si es un Guid completo, usamos Find (es más rápido)
+        if (Guid.TryParse(idInput, out Guid fullGuid))
+        {
+            return _context.Tasks.Find(fullGuid);
+        }
 
-        try
-        {
-            string jsonString = File.ReadAllText(FilePath);
-            _tasks = JsonSerializer.Deserialize<List<TaskItem>>(jsonString) ?? new List<TaskItem>();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error loading tasks: {ex.Message}");
-            _tasks = new List<TaskItem>();
-        }
+        // Si no es un Guid completo, buscamos tareas cuyo ID empiece con ese texto
+        return _context.Tasks
+            .AsEnumerable() // Traemos a memoria para comparar strings del Guid
+            .FirstOrDefault(t => t.Id.ToString().StartsWith(idInput, StringComparison.OrdinalIgnoreCase));
     }
 
-    public bool UpdateTaskStatus(string partialId, Models.TaskStatus newStatus)
+    public bool UpdateTaskStatus(string idInput, Models.TaskStatus newStatus)
     {
-        //Buscamos la tarea por su ID 
-        var task = _tasks.FirstOrDefault(t => t.Id.ToString().StartsWith(partialId));
-        if (task != null)
-        {
-            task.Status = newStatus;
-            SaveToFile();
-            return true;
-        }
-        return false;
+        var task = GetTaskByIdOrPartial(idInput);
+        if (task == null) return false;
+
+        task.Status = newStatus;
+        _context.SaveChanges();
+        return true;
     }
 
-    public bool DeleteTask(string partialId)
+    public bool DeleteTask(string idInput)
     {
-        //LINQ find and remove
-        var taskToRemove = _tasks.FirstOrDefault(task => task.Id.ToString().StartsWith(partialId));
+        var task = GetTaskByIdOrPartial(idInput);
+        if (task == null) return false;
 
-        if (taskToRemove != null)
-        {
-            _tasks.Remove(taskToRemove);
-
-            //Update the JSON
-            SaveToFile();
-            return true;
-        }
-        return false;
+        _context.Tasks.Remove(task);
+        _context.SaveChanges();
+        return true;
     }
 }
+
+
+
