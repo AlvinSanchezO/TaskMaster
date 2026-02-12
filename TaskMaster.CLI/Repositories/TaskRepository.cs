@@ -1,11 +1,11 @@
-﻿using TaskMaster.CLI.Models;
-using TaskMaster.CLI.Data;
-using System.Collections.Generic;
-using System.Linq;
+﻿using TaskMaster.CLI.Data;
+using TaskMaster.CLI.Interfaces;
+using TaskMaster.CLI.Models;
+using MyTaskStatus = TaskMaster.CLI.Models.TaskStatus;
 
 namespace TaskMaster.CLI.Repositories;
 
-public class TaskRepository
+public class TaskRepository : ITaskRepository
 {
     private readonly AppDbContext _context;
 
@@ -40,7 +40,7 @@ public class TaskRepository
             .FirstOrDefault(t => t.Id.ToString().StartsWith(idInput, StringComparison.OrdinalIgnoreCase));
     }
 
-    public bool UpdateTaskStatus(string idInput, Models.TaskStatus newStatus)
+    public bool UpdateTaskStatus(string idInput, TaskMaster.CLI.Models.TaskStatus newStatus)
     {
         var task = GetTaskByIdOrPartial(idInput);
         if (task == null) return false;

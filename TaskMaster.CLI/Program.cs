@@ -1,12 +1,13 @@
-﻿using TaskMaster.CLI.Models;
+﻿using TaskMaster.CLI.Data;
+using TaskMaster.CLI.Interfaces;
+using TaskMaster.CLI.Models;
 using TaskMaster.CLI.Repositories;
-using TaskMaster.CLI.Data;
 
 //Initialize our context
 using var context = new AppDbContext();
 
 // Initialize our database
-var repository = new TaskRepository(context);
+ITaskRepository repository = new TaskRepository(context);
 
 Console.WriteLine("Welcome to TaskMaster CLI");
 Console.WriteLine("Commands: add | list | complete | exit");
