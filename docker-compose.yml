@@ -5,10 +5,10 @@ services:
     restart: always
     environment:
       POSTGRES_USER: alvin_user
-      POSTGRES_PASSWORD: your_secure_password
+      POSTGRES_PASSWORD: password123
       POSTGRES_DB: taskmaster_db
     ports:
-      - "5432:5432"
+      - "5433:5432"  # <--- Cambia 5432 por 5433 a la izquierda
     volumes:
       - ./postgres-data:/var/lib/postgresql/data
     deploy:
@@ -24,6 +24,6 @@ services:
     depends_on:
       - db
     environment:
-      - ConnectionStrings__DefaultConnection=Host=db;Database=taskmaster_db;Username=alvin_user;Password=your_secure_password
+      - ConnectionStrings__DefaultConnection=Host=db;Database=taskmaster_db;Username=alvin_user;Password=password123
     stdin_open: true
     tty: true
