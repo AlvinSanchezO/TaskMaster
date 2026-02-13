@@ -16,6 +16,11 @@ public class TaskRepository : ITaskRepository
 
     public void AddTask(TaskItem task)
     {
+        ////Validation: Title is required
+        if (string.IsNullOrWhiteSpace(task.Title))
+        {
+            throw new ArgumentException("El titulo de la tarea no puede estar vacio");
+        }
         _context.Tasks.Add(task);
         _context.SaveChanges(); // INSERT ef core 
     }
