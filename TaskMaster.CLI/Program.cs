@@ -2,12 +2,17 @@
 using TaskMaster.CLI.Interfaces;
 using TaskMaster.CLI.Models;
 using TaskMaster.CLI.Repositories;
+using Microsoft.Extensions.DependencyInjection; 
 
-//Initialize our context
-using var context = new AppDbContext();
+//Setup services
+var serviceProvider = new ServiceCollection()
+    .AddDbContext<AppDbContext>() //context registration
+    .AddScoped<ITaskRepository, TaskRepository>() //Registation of our repository
+    .BuildServiceProvider();
 
-// Initialize our database
-ITaskRepository repository = new TaskRepository(context);
+//Instance of our repository
+using var score =serviceProvider.CreateScope();   
+var repository = score.ServiceProvider.GetRequiredService<ITaskRepository>(); 
 
 Console.WriteLine("Welcome to TaskMaster CLI");
 Console.WriteLine("Commands: add | list | complete | exit");
