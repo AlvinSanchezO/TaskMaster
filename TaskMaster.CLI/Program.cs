@@ -26,16 +26,31 @@ while (true)
     switch (command)
     {
         case "add":
-            Console.Write("Enter Title: ");
-            string title = Console.ReadLine() ?? "";
+            try
+            {
+                Console.Write("Enter Title: ");
+                string title = Console.ReadLine() ?? "";
 
-            Console.Write("Enter Description: ");
-            string desc = Console.ReadLine() ?? "";
+                Console.Write("Enter Description: ");
+                string desc = Console.ReadLine() ?? "";
 
-            var newTask = new TaskItem(title, desc);
-            repository.AddTask(newTask);
+                var newTask = new TaskItem(title, desc);
+                repository.AddTask(newTask);
 
-            Console.WriteLine("Task added successfully!");
+                Console.WriteLine("Task added successfully!");
+            }
+            catch (ArgumentException ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"[Error de validacion]: {ex.Message }");
+                Console.ResetColor();
+            }
+            catch (Exception ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"[Error inesperado]: {ex.Message}");
+                Console.ResetColor();
+            }
             break;
 
         case "list":
@@ -101,14 +116,16 @@ while (true)
             Console.Write("Enter Task ID (full or short): ");
             string idInput = Console.ReadLine() ?? "";
 
-            // Ya no parseamos a Guid aquí, el repositorio se encarga
             if (repository.UpdateTaskStatus(idInput, TaskMaster.CLI.Models.TaskStatus.Completed))
             {
                 Console.WriteLine("Task marked as Completed!");
             }
             else
             {
-                Console.WriteLine("Task not found.");
+                // Cambiamos a rojo para indicar un error de búsqueda
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("Error: Task not found.");
+                Console.ResetColor();
             }
             break;
 
@@ -118,13 +135,15 @@ while (true)
 
             if (repository.DeleteTask(idToDelete))
             {
-                Console.ForegroundColor = ConsoleColor.Red;
+                // El éxito del borrado suele ser información crítica, 
+                // pero si prefieres el rojo solo para errores, puedes dejar este en blanco.
                 Console.WriteLine("Task deleted successfully!");
-                Console.ResetColor();
             }
             else
             {
-                Console.WriteLine("Task not found.");
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("Error: Task not found.");
+                Console.ResetColor();
             }
             break;
     }
