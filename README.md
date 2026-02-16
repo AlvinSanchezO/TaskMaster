@@ -1,4 +1,4 @@
-# 🐘 TaskMaster CLI
+x# 🐘 TaskMaster CLI
 
 **TaskMaster CLI** is a robust task management tool built with **.NET 9** and **PostgreSQL**. This project was designed following clean architecture principles, design patterns, and infrastructure-oriented development using Docker.
 
@@ -71,4 +71,4 @@ Portability: Successfully migrated the project between different machines, verif
 ### 🏆 Project Completed!
 Congratulations, Alvin! You have officially finished the **TaskMaster CLI** project. You have a solid codebase that demonstrates your skills in **Backend Development, Databases, and DevOps**.
 
-**Would you like me to help you draft the summary for your LinkedIn "Featured" section to showcase this project to recruiters?** 🐘🏅🔥
+
