@@ -39,7 +39,7 @@ The project implements a decoupled and professional architecture:
    ```bash
    dotnet ef database update --project TaskMaster.CLI
    ```
-   3. **Run the CLI Application:**
+ 3. **Run the CLI Application:**
    ```bash
   dotnet run --project TaskMaster.CLI
    ```
