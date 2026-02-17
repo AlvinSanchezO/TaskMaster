@@ -55,17 +55,6 @@ Database Synchronization: Mastered the use of dotnet-ef tools to keep the Postgr
 
 Portability: Successfully migrated the project between different machines, verifying that it runs on the first attempt thanks to containerization and clear documentation.
 
-### 🚀 Final Push Instructions
-
-1.  **Save the file** as `README.md` in your root folder.
-2.  **Commit and Push:**
-    ```powershell
-    git add .
-    git commit -m "docs: added professional README in English"
-    git push origin docs/final-readme
-    ```
-3.  **Merge the PR:** Go to GitHub and merge this final branch into `main`.
-
 
 
 
