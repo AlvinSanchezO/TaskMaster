@@ -5,31 +5,37 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Registro de Servicios (Estándar .NET 9)
+// 1. Registro de Servicios e Infraestructura
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(); // Requiere el paquete Swashbuckle.AspNetCore
+builder.Services.AddSwaggerGen();
 
-// 2. Tu Infraestructura Reutilizada
-builder.Services.AddDbContext<AppDbContext>();
+// 2. Configuración de la Base de Datos con la Connection String del appsettings.json
+// Esto asegura que la API use el puerto 5433 definido para Docker
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(connectionString));
+
+// 3. Inyección del Repositorio
 builder.Services.AddScoped<ITaskRepository, TaskRepository>();
 
 var app = builder.Build();
 
-// 3. Configuración del Pipeline
+// 4. Configuración del Pipeline
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI(); // Interfaz visual en /swagger/index.html
+    app.UseSwaggerUI();
 }
 
 app.UseHttpsRedirection();
 
-// 4. Endpoints (Eliminamos .WithOpenApi() para evitar el aviso de 'obsoleto')
+// 5. Endpoint GET real que consume la base de datos
 app.MapGet("/api/tasks", (ITaskRepository repo) =>
 {
     var tasks = repo.GetAllTasks();
     return Results.Ok(tasks);
 })
-.WithName("GetTasks"); // .WithOpenApi() ya no es necesario aquí en .NET 9
+.WithName("GetTasks");
 
 app.Run();
