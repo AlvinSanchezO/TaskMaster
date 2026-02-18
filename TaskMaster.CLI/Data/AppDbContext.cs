@@ -10,16 +10,26 @@ namespace TaskMaster.CLI.Data
 {
     public class AppDbContext : DbContext
     {
-        //This poperty represents the table Tasks in the database Postgress
+        // 1. CONSTRUCTOR PARA LA API: Permite que la API inyecte la configuración externa
+        public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
+        {
+        }
+
+        // 2. CONSTRUCTOR PARA LA CLI: Permite que la consola siga funcionando sin cambios
+        public AppDbContext()
+        {
+        }
+
         public DbSet<TaskItem> Tasks { get; set; }
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
-            // Usamos 'localhost' porque estás ejecutando el comando desde Windows
-            // Los datos coinciden exactamente con tu archivo YAML
-            var connectionString = "Host=localhost;Port=5433;Database=taskmaster_db;Username=alvin_user;Password=password123";
-
-            optionsBuilder.UseNpgsql(connectionString);
+            // 3. SOLO CONFIGURAMOS SI NO VIENE YA CONFIGURADO DESDE LA API
+            if (!optionsBuilder.IsConfigured)
+            {
+                var connectionString = "Host=localhost;Port=5433;Database=taskmaster_db;Username=alvin_user;Password=password123";
+                optionsBuilder.UseNpgsql(connectionString);
+            }
         }
     }
 }
