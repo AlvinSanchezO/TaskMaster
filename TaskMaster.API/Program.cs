@@ -2,26 +2,25 @@ using TaskMaster.CLI.Data;
 using TaskMaster.CLI.Interfaces;
 using TaskMaster.CLI.Repositories;
 using Microsoft.EntityFrameworkCore;
+using TaskMaster.CLI.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Registro de Servicios e Infraestructura
+// Registro de Servicios e Infraestructura
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// 2. Configuración de la Base de Datos con la Connection String del appsettings.json
-// Esto asegura que la API use el puerto 5433 definido para Docker
+// Configuración de la Base de Datos
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString));
 
-// 3. Inyección del Repositorio
+// Inyección del Repositorio
 builder.Services.AddScoped<ITaskRepository, TaskRepository>();
 
 var app = builder.Build();
 
-// 4. Configuración del Pipeline
+// Configuración del Pipeline
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -30,12 +29,41 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-// 5. Endpoint GET real que consume la base de datos
+// --- ENDPOINTS ---
+
+// GET: Obtener todas las tareas
 app.MapGet("/api/tasks", (ITaskRepository repo) =>
 {
-    var tasks = repo.GetAllTasks();
-    return Results.Ok(tasks);
+    return Results.Ok(repo.GetAllTasks());
 })
 .WithName("GetTasks");
 
+// POST: Create a new task
+app.MapPost("/api/tasks", (CreateTaskRequest input, ITaskRepository repo) =>
+{
+    var newTask = new TaskItem(input.Title, input.Description ?? "");
+    repo.AddTask(newTask);
+    return Results.Created($"/api/tasks/{newTask.Id}", newTask);
+})
+.WithName("CreateTask");
+
+// PUT: Complete a task
+app.MapPut("/api/tasks/{id}/complete", (Guid id, ITaskRepository repo) =>
+{
+    var success = repo.UpdateTaskStatus(id.ToString(), TaskMaster.CLI.Models.TaskStatus.Completed);
+
+    return success ? Results.NoContent() : Results.NotFound();
+})
+.WithName("CompleteTask");
+
+// DELETE: Quit a task
+app.MapDelete("/api/tasks/{id}", (Guid id, ITaskRepository repo) =>
+{
+    var success = repo.DeleteTask(id.ToString());
+    return success ? Results.NoContent() : Results.NotFound();
+})
+.WithName("DeleteTask");
 app.Run();
+
+// DTO for creating a new task
+record CreateTaskRequest(string Title, string? Description);
