@@ -39,24 +39,21 @@ while (true)
                 Console.Write("Enter Description: ");
                 string desc = Console.ReadLine() ?? "";
 
-                var newTask = new TaskItem(title, desc);
+                // --- CORRECCIÓN [#TM-023] ---
+                Guid consoleUserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+                var newTask = new TaskItem(title, desc, consoleUserId);
                 repository.AddTask(newTask);
+                // ----------------------------
 
                 Console.WriteLine("Task added successfully!");
-            }
-            catch (ArgumentException ex)
+            } // <--- Esta llave cierra el try
+            catch (Exception ex) // <--- Este bloque es obligatorio
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"[Error de validacion]: {ex.Message }");
+                Console.WriteLine($"[Error]: {ex.Message}");
                 Console.ResetColor();
             }
-            catch (Exception ex)
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"[Error inesperado]: {ex.Message}");
-                Console.ResetColor();
-            }
-            break;
+            break; // <--- Este break evita que el control pase al siguiente case
 
         case "list":
             // 1. Obtenemos todas las tareas primero
