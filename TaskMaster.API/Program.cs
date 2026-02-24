@@ -2,7 +2,7 @@ using TaskMaster.CLI.Data;
 using TaskMaster.CLI.Interfaces;
 using TaskMaster.CLI.Repositories;
 using TaskMaster.CLI.Models;
-using TaskMaster.CLI.Services; 
+using TaskMaster.CLI.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
@@ -11,21 +11,21 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-//REGISTRO DE SERVICIOS
+// --- REGISTRO DE SERVICIOS ---
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-//Base de Datos
+// Base de Datos
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString));
 
-//Inyección de Dependencias
+// Inyección de Dependencias
 builder.Services.AddScoped<ITaskRepository, TaskRepository>();
 builder.Services.AddScoped<AuthService>();
-builder.Services.AddScoped<UserService>(); // Registro de UserService del CLI
+builder.Services.AddScoped<UserService>();
 
-//Configuración de Autenticación JWT
+// Configuración de Autenticación JWT
 builder.Services.AddAuthentication("Bearer")
     .AddJwtBearer(options =>
     {
@@ -46,7 +46,7 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-//PIPELINE
+// --- PIPELINE ---
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -54,9 +54,10 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-app.UseAuthentication(); 
+app.UseAuthentication();
+app.UseAuthorization(); // Importante añadir esta línea para procesar permisos
 
-//ENDPOINTS DE AUTENTICACIÓN 
+// --- ENDPOINTS DE AUTENTICACIÓN ---
 
 // POST: Registrar un nuevo usuario
 app.MapPost("/api/auth/register", (UserAuthRequest req, UserService userService) =>
@@ -66,17 +67,16 @@ app.MapPost("/api/auth/register", (UserAuthRequest req, UserService userService)
 })
 .WithName("Register");
 
-//POST: Login y generación de JWT
+// POST: Login y generación de JWT
 app.MapPost("/api/auth/login", (UserAuthRequest req, UserService userService, IConfiguration config) =>
 {
     var user = userService.Login(req.Username, req.Password);
     if (user == null) return Results.Unauthorized();
 
-    //Estructura del Token 
     var claims = new[]
     {
         new Claim(ClaimTypes.Name, user.Username),
-        new Claim(ClaimTypes.NameIdentifier, user.Id.ToString())
+        new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()) // Este ID lo usaremos para las tareas
     };
 
     var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(config["Jwt:Key"]!));
@@ -94,31 +94,76 @@ app.MapPost("/api/auth/login", (UserAuthRequest req, UserService userService, IC
 })
 .WithName("Login");
 
-//EndPoints de Tareas (protegidos por JWT)
+// --- ENDPOINTS DE TAREAS (PROTEGIDOS POR JWT) [#TM-023] ---
 
-app.MapGet("/api/tasks", (ITaskRepository repo) => Results.Ok(repo.GetAllTasks())).WithName("GetTasks");
-
-app.MapPost("/api/tasks", (CreateTaskRequest input, ITaskRepository repo) =>
+// GET: Solo devuelve las tareas que pertenecen al usuario autenticado
+app.MapGet("/api/tasks", (ITaskRepository repo, ClaimsPrincipal user) =>
 {
-    var newTask = new TaskItem(input.Title, input.Description ?? "");
+    var userIdStr = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+    if (userIdStr == null) return Results.Unauthorized();
+
+    var currentUserId = Guid.Parse(userIdStr);
+
+    // Filtrado de propiedad: Principio de Mínimo Privilegio
+    var myTasks = repo.GetAllTasks().Where(t => t.UserId == currentUserId);
+    return Results.Ok(myTasks);
+})
+.WithName("GetTasks")
+.RequireAuthorization();
+
+// POST: Crea una tarea vinculada automáticamente al UserId del Token
+app.MapPost("/api/tasks", (CreateTaskRequest input, ITaskRepository repo, ClaimsPrincipal user) =>
+{
+    var userIdStr = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+    if (userIdStr == null) return Results.Unauthorized();
+
+    var currentUserId = Guid.Parse(userIdStr);
+
+    // CORREGIDO: Se pasa currentUserId como tercer argumento
+    var newTask = new TaskItem(input.Title, input.Description ?? "", currentUserId);
+
     repo.AddTask(newTask);
     return Results.Created($"/api/tasks/{newTask.Id}", newTask);
-}).WithName("CreateTask");
+})
+.WithName("CreateTask")
+.RequireAuthorization();
 
-app.MapPut("/api/tasks/{id}/complete", (Guid id, ITaskRepository repo) =>
+// PUT: Marcar como completa (Solo si el usuario es el dueño)
+app.MapPut("/api/tasks/{id}/complete", (Guid id, ITaskRepository repo, ClaimsPrincipal user) =>
 {
+    var userIdStr = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+    if (userIdStr == null) return Results.Unauthorized();
+    var currentUserId = Guid.Parse(userIdStr);
+
+    var task = repo.GetAllTasks().FirstOrDefault(t => t.Id == id);
+    if (task == null) return Results.NotFound();
+    if (task.UserId != currentUserId) return Results.Forbid(); // No es tu tarea
+
     var success = repo.UpdateTaskStatus(id.ToString(), TaskMaster.CLI.Models.TaskStatus.Completed);
     return success ? Results.NoContent() : Results.NotFound();
-}).WithName("CompleteTask");
+})
+.WithName("CompleteTask")
+.RequireAuthorization();
 
-app.MapDelete("/api/tasks/{id}", (Guid id, ITaskRepository repo) =>
+// DELETE: Borrar tarea (Solo si el usuario es el dueño)
+app.MapDelete("/api/tasks/{id}", (Guid id, ITaskRepository repo, ClaimsPrincipal user) =>
 {
+    var userIdStr = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+    if (userIdStr == null) return Results.Unauthorized();
+    var currentUserId = Guid.Parse(userIdStr);
+
+    var task = repo.GetAllTasks().FirstOrDefault(t => t.Id == id);
+    if (task == null) return Results.NotFound();
+    if (task.UserId != currentUserId) return Results.Forbid(); // No es tu tarea
+
     var success = repo.DeleteTask(id.ToString());
     return success ? Results.NoContent() : Results.NotFound();
-}).WithName("DeleteTask");
+})
+.WithName("DeleteTask")
+.RequireAuthorization();
 
 app.Run();
 
-// DTOs
+// --- DTOs ---
 record CreateTaskRequest(string Title, string? Description);
-record UserAuthRequest(string Username, string Password); // DTO para Auth
+record UserAuthRequest(string Username, string Password);

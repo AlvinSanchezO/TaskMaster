@@ -2,30 +2,30 @@
 
 public class TaskItem
 {
-    // 1. Propiedades
     public Guid Id { get; set; }
     public string Title { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public TaskStatus Status { get; set; }
     public DateTime CreatedAt { get; set; }
 
-    // 2. Constructor VACÍO (Obligatorio para Entity Framework)
-    // EF usa este para "crear" el objeto antes de llenarlo con datos de la DB
+    // Vincula la tarea con el ID del usuario que la creó
+    public Guid UserId { get; set; }
+
     public TaskItem() { }
 
-    // 3. Tu Constructor con parámetros (Para tu uso manual)
-    public TaskItem(string title, string description)
+    // Actualizamos el constructor para que pida el UserId obligatoriamente
+    public TaskItem(string title, string description, Guid userId)
     {
         Id = Guid.NewGuid();
         Title = title;
         Description = description;
         Status = TaskStatus.Pending;
         CreatedAt = DateTime.UtcNow;
+        UserId = userId; // Asignamos el dueño
     }
 
-    // 4. Métodos
     public override string ToString()
     {
-        return $"[{Id.ToString()[..8]}] {Title} - Status: {Status} (Created: {CreatedAt:yyyy-MM-dd})";
+        return $"[{Id.ToString()[..8]}] {Title} - Status: {Status} (Owner: {UserId.ToString()[..4]})";
     }
 }
