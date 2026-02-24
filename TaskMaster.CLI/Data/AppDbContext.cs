@@ -31,5 +31,8 @@ namespace TaskMaster.CLI.Data
                 optionsBuilder.UseNpgsql(connectionString);
             }
         }
+
+        //New User table
+        public DbSet<User> Users { get; set; }
     }
 }
