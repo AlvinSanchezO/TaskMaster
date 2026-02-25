@@ -11,9 +11,18 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// --- REGISTRO DE SERVICIOS ---
+//REGISTRO DE SERVICIOS 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+//CONFIGURACIÓN DE CORS 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowBlazor", policy =>
+        policy.WithOrigins("http://localhost:5049")
+              .AllowAnyMethod()
+              .AllowAnyHeader());
+});
 
 // Base de Datos
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
@@ -46,20 +55,22 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-// --- PIPELINE ---
+//PIPELINE
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
+//ACTIVAR CORS 
+app.UseCors("AllowBlazor");
+
 app.UseHttpsRedirection();
 app.UseAuthentication();
-app.UseAuthorization(); // Importante añadir esta línea para procesar permisos
+app.UseAuthorization();
 
-// --- ENDPOINTS DE AUTENTICACIÓN ---
+//ENDPOINTS DE AUTENTICACIÓN
 
-// POST: Registrar un nuevo usuario
 app.MapPost("/api/auth/register", (UserAuthRequest req, UserService userService) =>
 {
     var user = userService.Register(req.Username, req.Password);
@@ -67,7 +78,6 @@ app.MapPost("/api/auth/register", (UserAuthRequest req, UserService userService)
 })
 .WithName("Register");
 
-// POST: Login y generación de JWT
 app.MapPost("/api/auth/login", (UserAuthRequest req, UserService userService, IConfiguration config) =>
 {
     var user = userService.Login(req.Username, req.Password);
@@ -76,7 +86,7 @@ app.MapPost("/api/auth/login", (UserAuthRequest req, UserService userService, IC
     var claims = new[]
     {
         new Claim(ClaimTypes.Name, user.Username),
-        new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()) // Este ID lo usaremos para las tareas
+        new Claim(ClaimTypes.NameIdentifier, user.Id.ToString())
     };
 
     var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(config["Jwt:Key"]!));
@@ -94,32 +104,26 @@ app.MapPost("/api/auth/login", (UserAuthRequest req, UserService userService, IC
 })
 .WithName("Login");
 
-// --- ENDPOINTS DE TAREAS (PROTEGIDOS POR JWT) [#TM-023] ---
+//ENDPOINTS DE TAREAS (PROTEGIDOS POR JWT) 
 
-// GET: Solo devuelve las tareas que pertenecen al usuario autenticado
 app.MapGet("/api/tasks", (ITaskRepository repo, ClaimsPrincipal user) =>
 {
     var userIdStr = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
     if (userIdStr == null) return Results.Unauthorized();
 
     var currentUserId = Guid.Parse(userIdStr);
-
-    // Filtrado de propiedad: Principio de Mínimo Privilegio
     var myTasks = repo.GetAllTasks().Where(t => t.UserId == currentUserId);
     return Results.Ok(myTasks);
 })
 .WithName("GetTasks")
 .RequireAuthorization();
 
-// POST: Crea una tarea vinculada automáticamente al UserId del Token
 app.MapPost("/api/tasks", (CreateTaskRequest input, ITaskRepository repo, ClaimsPrincipal user) =>
 {
     var userIdStr = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
     if (userIdStr == null) return Results.Unauthorized();
 
     var currentUserId = Guid.Parse(userIdStr);
-
-    // CORREGIDO: Se pasa currentUserId como tercer argumento
     var newTask = new TaskItem(input.Title, input.Description ?? "", currentUserId);
 
     repo.AddTask(newTask);
@@ -128,7 +132,6 @@ app.MapPost("/api/tasks", (CreateTaskRequest input, ITaskRepository repo, Claims
 .WithName("CreateTask")
 .RequireAuthorization();
 
-// PUT: Marcar como completa (Solo si el usuario es el dueño)
 app.MapPut("/api/tasks/{id}/complete", (Guid id, ITaskRepository repo, ClaimsPrincipal user) =>
 {
     var userIdStr = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -137,7 +140,7 @@ app.MapPut("/api/tasks/{id}/complete", (Guid id, ITaskRepository repo, ClaimsPri
 
     var task = repo.GetAllTasks().FirstOrDefault(t => t.Id == id);
     if (task == null) return Results.NotFound();
-    if (task.UserId != currentUserId) return Results.Forbid(); // No es tu tarea
+    if (task.UserId != currentUserId) return Results.Forbid();
 
     var success = repo.UpdateTaskStatus(id.ToString(), TaskMaster.CLI.Models.TaskStatus.Completed);
     return success ? Results.NoContent() : Results.NotFound();
@@ -145,7 +148,6 @@ app.MapPut("/api/tasks/{id}/complete", (Guid id, ITaskRepository repo, ClaimsPri
 .WithName("CompleteTask")
 .RequireAuthorization();
 
-// DELETE: Borrar tarea (Solo si el usuario es el dueño)
 app.MapDelete("/api/tasks/{id}", (Guid id, ITaskRepository repo, ClaimsPrincipal user) =>
 {
     var userIdStr = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -154,7 +156,7 @@ app.MapDelete("/api/tasks/{id}", (Guid id, ITaskRepository repo, ClaimsPrincipal
 
     var task = repo.GetAllTasks().FirstOrDefault(t => t.Id == id);
     if (task == null) return Results.NotFound();
-    if (task.UserId != currentUserId) return Results.Forbid(); // No es tu tarea
+    if (task.UserId != currentUserId) return Results.Forbid();
 
     var success = repo.DeleteTask(id.ToString());
     return success ? Results.NoContent() : Results.NotFound();
@@ -164,6 +166,5 @@ app.MapDelete("/api/tasks/{id}", (Guid id, ITaskRepository repo, ClaimsPrincipal
 
 app.Run();
 
-// --- DTOs ---
 record CreateTaskRequest(string Title, string? Description);
 record UserAuthRequest(string Username, string Password);

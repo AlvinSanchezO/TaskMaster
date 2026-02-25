@@ -1,0 +1,36 @@
+﻿@page "/tasks"
+@using TaskMaster.CLI.Models
+@inject HttpClient Http
+
+<h3>Mis Tareas</h3>
+
+@if (tasks == null)
+{
+    <p><em>Cargando tareas...</em></p>
+}
+else
+{
+    <ul>
+        @foreach (var task in tasks)
+        {
+            <li>@task.Title - @task.Status</li>
+        }
+    </ul>
+}
+
+@code {
+    private TaskItem[]? tasks;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try 
+        {
+            // Nota: Esto fallará con 401 hasta que implementemos el Login en Blazor
+            tasks = await Http.GetFromJsonAsync<TaskItem[]>("api/tasks");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al obtener tareas: {ex.Message}");
+        }
+    }
+}
