@@ -2,151 +2,25 @@
 using TaskMaster.CLI.Interfaces;
 using TaskMaster.CLI.Models;
 using TaskMaster.CLI.Repositories;
-using Microsoft.Extensions.DependencyInjection; 
+using Microsoft.Extensions.DependencyInjection;
 
-//Setup services
-var serviceProvider = new ServiceCollection()
-    .AddDbContext<AppDbContext>() //context registration
-    .AddScoped<ITaskRepository, TaskRepository>() //Registation of our repository
-    .BuildServiceProvider();
+// --- CAMBIO AQUÍ: Envolver en una clase ---
+namespace TaskMaster.CLI;
 
-//Instance of our repository
-using var score =serviceProvider.CreateScope();   
-var repository = score.ServiceProvider.GetRequiredService<ITaskRepository>(); 
-
-Console.WriteLine("Welcome to TaskMaster CLI");
-Console.WriteLine("Commands: add | list | complete | exit");
-
-while (true)
+public class Program
 {
-    Console.Write("\n> Enter command: ");
-    string command = Console.ReadLine()?.ToLower().Trim() ?? "";
-
-    if (command == "exit")
+    public static void Main(string[] args)
     {
-        Console.WriteLine("Goodbye!");
-        break;
-    }
+        // Pega TODO el código que ya tenías aquí adentro:
+        var serviceProvider = new ServiceCollection()
+            .AddDbContext<AppDbContext>()
+            .AddScoped<ITaskRepository, TaskRepository>()
+            .BuildServiceProvider();
 
-    switch (command)
-    {
-        case "add":
-            try
-            {
-                Console.Write("Enter Title: ");
-                string title = Console.ReadLine() ?? "";
+        using var score = serviceProvider.CreateScope();
+        var repository = score.ServiceProvider.GetRequiredService<ITaskRepository>();
 
-                Console.Write("Enter Description: ");
-                string desc = Console.ReadLine() ?? "";
-
-                // --- CORRECCIÓN [#TM-023] ---
-                Guid consoleUserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-                var newTask = new TaskItem(title, desc, consoleUserId);
-                repository.AddTask(newTask);
-                // ----------------------------
-
-                Console.WriteLine("Task added successfully!");
-            } // <--- Esta llave cierra el try
-            catch (Exception ex) // <--- Este bloque es obligatorio
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"[Error]: {ex.Message}");
-                Console.ResetColor();
-            }
-            break; // <--- Este break evita que el control pase al siguiente case
-
-        case "list":
-            // 1. Obtenemos todas las tareas primero
-            var allTasks = repository.GetAllTasks().ToList();
-
-            if (!allTasks.Any())
-            {
-                Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.WriteLine("\nYour task list is empty! Enjoy your free time.");
-                Console.ResetColor();
-            }
-            else
-            {
-                // 2. Preguntamos por el filtro justo antes de mostrar nada
-                Console.Write("Filter by status? (all | pending | completed) [all]: ");
-                string filter = Console.ReadLine()?.ToLower().Trim() ?? "all";
-
-                // 3. Filtramos la lista original usando LINQ
-                var tasksToShow = filter switch
-                {
-                    "pending" => allTasks.Where(t => t.Status == TaskMaster.CLI.Models.TaskStatus.Pending).ToList(),
-                    "completed" => allTasks.Where(t => t.Status == TaskMaster.CLI.Models.TaskStatus.Completed).ToList(),
-                    _ => allTasks
-                };
-
-                // 4. Verificamos si el filtro nos dejó con algo que mostrar
-                if (!tasksToShow.Any())
-                {
-                    Console.WriteLine($"\nNo tasks found with status: {filter}");
-                }
-                else
-                {
-                    // 5. Dibujamos la tabla usando solo las tareas filtradas (tasksToShow)
-                    Console.WriteLine("\n" + new string('=', 60));
-                    Console.WriteLine($"{"ID",-10} | {"TITLE",-25} | {"STATUS",-12}");
-                    Console.WriteLine(new string('-', 60));
-
-                    foreach (var task in tasksToShow)
-                    {
-                        Console.ForegroundColor = task.Status switch
-                        {
-                            TaskMaster.CLI.Models.TaskStatus.Completed => ConsoleColor.Green,
-                            TaskMaster.CLI.Models.TaskStatus.InProgress => ConsoleColor.Yellow,
-                            _ => ConsoleColor.White
-                        };
-
-                        string shortId = task.Id.ToString().Substring(0, 8);
-                        string displayTitle = task.Title.Length > 25
-                            ? task.Title.Substring(0, 22) + "..."
-                            : task.Title;
-
-                        Console.WriteLine($"{shortId,-10} | {displayTitle,-25} | {task.Status,-12}");
-                    }
-
-                    Console.ResetColor();
-                    Console.WriteLine(new string('=', 60));
-                }
-            }
-            break;
-
-        case "complete":
-            Console.Write("Enter Task ID (full or short): ");
-            string idInput = Console.ReadLine() ?? "";
-
-            if (repository.UpdateTaskStatus(idInput, TaskMaster.CLI.Models.TaskStatus.Completed))
-            {
-                Console.WriteLine("Task marked as Completed!");
-            }
-            else
-            {
-                // Cambiamos a rojo para indicar un error de búsqueda
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("Error: Task not found.");
-                Console.ResetColor();
-            }
-            break;
-
-        case "delete":
-            Console.Write("Enter the ID of the task to delete (full or short): ");
-            string idToDelete = Console.ReadLine() ?? "";
-
-            if (repository.DeleteTask(idToDelete))
-            {
-                // El éxito del borrado suele ser información crítica, 
-                // pero si prefieres el rojo solo para errores, puedes dejar este en blanco.
-                Console.WriteLine("Task deleted successfully!");
-            }
-            else
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("Error: Task not found.");
-                Console.ResetColor();
-            }
-            break;
+        Console.WriteLine("Welcome to TaskMaster CLI");
+        // ... (el resto de tu lógica del switch y los comandos)
     }
 }
