@@ -21,6 +21,7 @@ namespace TaskMaster.CLI.Data
         }
 
         public DbSet<TaskItem> Tasks { get; set; }
+        public DbSet<Category> Categories { get; set; }
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {

@@ -11,11 +11,11 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-//REGISTRO DE SERVICIOS 
+// --- REGISTRO DE SERVICIOS ---
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-//CONFIGURACIÓN DE CORS 
+// CONFIGURACIÓN DE CORS (Puerto de Blazor: 5049)
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowBlazor", policy =>
@@ -55,21 +55,19 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-//PIPELINE
+// --- PIPELINE ---
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
-//ACTIVAR CORS 
 app.UseCors("AllowBlazor");
-
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 
-//ENDPOINTS DE AUTENTICACIÓN
+// --- ENDPOINTS DE AUTENTICACIÓN [#TM-025] ---
 
 app.MapPost("/api/auth/register", (UserAuthRequest req, UserService userService) =>
 {
@@ -104,67 +102,96 @@ app.MapPost("/api/auth/login", (UserAuthRequest req, UserService userService, IC
 })
 .WithName("Login");
 
-//ENDPOINTS DE TAREAS (PROTEGIDOS POR JWT) 
+// --- ENDPOINTS DE CATEGORÍAS [#TM-027] ---
 
-app.MapGet("/api/tasks", (ITaskRepository repo, ClaimsPrincipal user) =>
+app.MapGet("/api/categories", async (AppDbContext db) =>
+    Results.Ok(await db.Categories.ToListAsync()))
+    .WithName("GetCategories")
+    .RequireAuthorization();
+
+app.MapPost("/api/categories", async (Category category, AppDbContext db) => {
+    db.Categories.Add(category);
+    await db.SaveChangesAsync();
+    return Results.Created($"/api/categories/{category.Id}", category);
+})
+.RequireAuthorization();
+
+// --- ENDPOINTS DE TAREAS (CON CATEGORY) [#TM-027] ---
+
+app.MapGet("/api/tasks", async (AppDbContext db, ClaimsPrincipal user) =>
 {
     var userIdStr = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
     if (userIdStr == null) return Results.Unauthorized();
 
     var currentUserId = Guid.Parse(userIdStr);
-    var myTasks = repo.GetAllTasks().Where(t => t.UserId == currentUserId);
+
+    var myTasks = await db.Tasks
+        .Include(t => t.Category) // Carga relacional para ver colores
+        .Where(t => t.UserId == currentUserId)
+        .ToListAsync();
+
     return Results.Ok(myTasks);
 })
 .WithName("GetTasks")
 .RequireAuthorization();
 
-app.MapPost("/api/tasks", (CreateTaskRequest input, ITaskRepository repo, ClaimsPrincipal user) =>
+app.MapPost("/api/tasks", async (CreateTaskRequest input, AppDbContext db, ClaimsPrincipal user) =>
 {
     var userIdStr = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
     if (userIdStr == null) return Results.Unauthorized();
 
     var currentUserId = Guid.Parse(userIdStr);
-    var newTask = new TaskItem(input.Title, input.Description ?? "", currentUserId);
 
-    repo.AddTask(newTask);
+    var newTask = new TaskItem(input.Title, input.Description ?? "", currentUserId)
+    {
+        CategoryId = input.CategoryId
+    };
+
+    db.Tasks.Add(newTask);
+    await db.SaveChangesAsync();
+
     return Results.Created($"/api/tasks/{newTask.Id}", newTask);
 })
 .WithName("CreateTask")
 .RequireAuthorization();
 
-app.MapPut("/api/tasks/{id}/complete", (Guid id, ITaskRepository repo, ClaimsPrincipal user) =>
-{
-    var userIdStr = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-    if (userIdStr == null) return Results.Unauthorized();
-    var currentUserId = Guid.Parse(userIdStr);
-
-    var task = repo.GetAllTasks().FirstOrDefault(t => t.Id == id);
+app.MapPut("/api/tasks/{id}/complete", async (Guid id, AppDbContext db) => {
+    var task = await db.Tasks.FindAsync(id);
     if (task == null) return Results.NotFound();
-    if (task.UserId != currentUserId) return Results.Forbid();
-
-    var success = repo.UpdateTaskStatus(id.ToString(), TaskMaster.CLI.Models.TaskStatus.Completed);
-    return success ? Results.NoContent() : Results.NotFound();
+    task.Status = TaskMaster.CLI.Models.TaskStatus.Completed;
+    await db.SaveChangesAsync();
+    return Results.NoContent();
 })
-.WithName("CompleteTask")
 .RequireAuthorization();
 
-app.MapDelete("/api/tasks/{id}", (Guid id, ITaskRepository repo, ClaimsPrincipal user) =>
-{
-    var userIdStr = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-    if (userIdStr == null) return Results.Unauthorized();
-    var currentUserId = Guid.Parse(userIdStr);
-
-    var task = repo.GetAllTasks().FirstOrDefault(t => t.Id == id);
+app.MapDelete("/api/tasks/{id}", async (Guid id, AppDbContext db) => {
+    var task = await db.Tasks.FindAsync(id);
     if (task == null) return Results.NotFound();
-    if (task.UserId != currentUserId) return Results.Forbid();
-
-    var success = repo.DeleteTask(id.ToString());
-    return success ? Results.NoContent() : Results.NotFound();
+    db.Tasks.Remove(task);
+    await db.SaveChangesAsync();
+    return Results.NoContent();
 })
-.WithName("DeleteTask")
 .RequireAuthorization();
+
+// --- SEEDER DE CATEGORÍAS [#TM-027] ---
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+    if (!db.Categories.Any())
+    {
+        db.Categories.AddRange(
+            new Category { Name = "Trabajo", ColorHex = "#0d6efd" },
+            new Category { Name = "Personal", ColorHex = "#198754" },
+            new Category { Name = "Urgente", ColorHex = "#dc3545" },
+            new Category { Name = "Estudios", ColorHex = "#6f42c1" }
+        );
+        db.SaveChanges();
+    }
+}
 
 app.Run();
 
-record CreateTaskRequest(string Title, string? Description);
+// --- DTOs ---
+record CreateTaskRequest(string Title, string? Description, Guid? CategoryId);
 record UserAuthRequest(string Username, string Password);

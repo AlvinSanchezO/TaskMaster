@@ -8,15 +8,27 @@
 <div class="container mt-4">
     <h3>Mi Tablero de Tareas</h3>
 
-    <div class="card mb-4 shadow-sm">
+    <div class="card mb-4 shadow-sm border-primary">
         <div class="card-body">
             <h5 class="card-title">Nueva Tarea</h5>
             <div class="row g-2">
-                <div class="col-md-5">
+                <div class="col-md-4">
                     <input @bind="newTaskTitle" class="form-control" placeholder="Título" />
                 </div>
-                <div class="col-md-5">
-                    <input @bind="newTaskDescription" class="form-control" placeholder="Descripción (opcional)" />
+                <div class="col-md-3">
+                    <input @bind="newTaskDescription" class="form-control" placeholder="Descripción" />
+                </div>
+                <div class="col-md-3">
+                    <select @bind="selectedCategoryId" class="form-control">
+                        <option value="">Sin categoría</option>
+                        @if (categories != null)
+                        {
+                            @foreach (var cat in categories)
+                            {
+                                <option value="@cat.Id">@cat.Name</option>
+                            }
+                        }
+                    </select>
                 </div>
                 <div class="col-md-2">
                     <button @onclick="CreateTask" class="btn btn-success w-100">Añadir</button>
@@ -25,7 +37,26 @@
         </div>
     </div>
 
-    @if (isLoading) // 5. Indicador de carga
+    <div class="card mb-4 border-info shadow-sm">
+        <div class="card-body">
+            <h6 class="card-title text-info">🎨 Gestionar Categorías</h6>
+            <div class="row g-2">
+                <div class="col-md-5">
+                    <input @bind="newCategoryName" class="form-control form-control-sm" placeholder="Nombre (Ej: Trabajo)" />
+                </div>
+                <div class="col-md-3">
+                    <input type="color" @bind="newCategoryColor" class="form-control form-control-sm form-control-color w-100" title="Elige un color" />
+                </div>
+                <div class="col-md-4">
+                    <button @onclick="CreateCategory" class="btn btn-info btn-sm w-100 text-white">
+                        ➕ Crear Categoría
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (isLoading)
     {
         <div class="text-center">
             <div class="spinner-border text-primary" role="status"></div>
@@ -37,6 +68,7 @@
         <table class="table table-hover shadow-sm mt-3">
             <thead class="table-dark">
                 <tr>
+                    <th>Categoría</th>
                     <th>Estado</th>
                     <th>Título</th>
                     <th>Descripción</th>
@@ -47,6 +79,18 @@
                 @foreach (var task in tasks)
                 {
                     <tr class="@(task.Status == TaskMaster.CLI.Models.TaskStatus.Completed ? "table-light opacity-75" : "")">
+                        <td>
+                            @if (task.Category != null)
+                            {
+                                <span class="badge" style="background-color: @task.Category.ColorHex; color: white;">
+                                    @task.Category.Name
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary">General</span>
+                            }
+                        </td>
                         <td>
                             <span class="badge @(task.Status == TaskMaster.CLI.Models.TaskStatus.Completed ? "bg-success" : "bg-warning")">
                                 @task.Status
@@ -73,13 +117,34 @@
 
 @code {
     private IEnumerable<TaskItem>? tasks;
+    private IEnumerable<Category>? categories;
     private bool isLoading = true;
+
+    // Variables Nueva Tarea
     private string newTaskTitle = "";
     private string newTaskDescription = "";
+    private Guid? selectedCategoryId;
 
-    protected override async Task OnInitializedAsync() => await LoadTasks();
+    // Variables Nueva Categoría [#TM-027]
+    private string newCategoryName = "";
+    private string newCategoryColor = "#808080";
 
-    private async Task LoadTasks() // 4. Refresco automático
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCategories();
+        await LoadTasks();
+    }
+
+    private async Task LoadCategories()
+    {
+        try
+        {
+            categories = await Http.GetFromJsonAsync<IEnumerable<Category>>("api/categories");
+        }
+        catch (Exception ex) { Console.WriteLine($"Error: {ex.Message}"); }
+    }
+
+    private async Task LoadTasks()
     {
         isLoading = true;
         var token = await localStorage.GetItemAsync<string>("authToken");
@@ -102,27 +167,49 @@
         }
     }
 
-    private async Task CreateTask() // 3. POST /api/tasks
+    private async Task CreateCategory() // Lógica para el nuevo botón [#TM-027]
+    {
+        if (string.IsNullOrWhiteSpace(newCategoryName)) return;
+
+        var newCat = new { Name = newCategoryName, ColorHex = newCategoryColor };
+        var response = await Http.PostAsJsonAsync("api/categories", newCat);
+
+        if (response.IsSuccessStatusCode)
+        {
+            newCategoryName = "";
+            newCategoryColor = "#808080";
+            await LoadCategories(); // Recarga el select automáticamente
+        }
+    }
+
+    private async Task CreateTask()
     {
         if (string.IsNullOrWhiteSpace(newTaskTitle)) return;
 
-        var newTask = new { Title = newTaskTitle, Description = newTaskDescription };
+        var newTask = new
+        {
+            Title = newTaskTitle,
+            Description = newTaskDescription,
+            CategoryId = selectedCategoryId
+        };
+
         var response = await Http.PostAsJsonAsync("api/tasks", newTask);
 
         if (response.IsSuccessStatusCode)
         {
             newTaskTitle = "";
             newTaskDescription = "";
-            await LoadTasks(); // Refrescar lista
+            selectedCategoryId = null;
+            await LoadTasks();
         }
     }
 
-    private async Task CompleteTask(Guid id) // 2. PUT /api/tasks/{id}/complete
+    private async Task CompleteTask(Guid id)
     {
         var response = await Http.PutAsync($"api/tasks/{id}/complete", null);
         if (response.IsSuccessStatusCode)
         {
-            await LoadTasks(); // Refrescar lista
+            await LoadTasks();
         }
     }
 }

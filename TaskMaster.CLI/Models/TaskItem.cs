@@ -7,6 +7,8 @@ public class TaskItem
     public string Description { get; set; } = string.Empty;
     public TaskStatus Status { get; set; }
     public DateTime CreatedAt { get; set; }
+    public Guid? CategoryId { get; set; } // Clave foránea
+    public Category? Category { get; set; } // Propiedad de navegación
 
     // Vincula la tarea con el ID del usuario que la creó
     public Guid UserId { get; set; }
