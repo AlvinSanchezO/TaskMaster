@@ -5,28 +5,83 @@
 @inject NavigationManager Navigation
 @inject HttpClient Http
 
-<h3>Mis Tareas</h3>
+<div class="container mt-4">
+    <h3>Mi Tablero de Tareas</h3>
 
-@if (tasks == null)
-{
-    <p><em>Cargando tareas...</em></p>
-}
-else
-{
-    <ul>
-        @foreach (var task in tasks)
-        {
-            <li>@task.Title - @task.Status</li>
-        }
-    </ul>
-}
+    <div class="card mb-4 shadow-sm">
+        <div class="card-body">
+            <h5 class="card-title">Nueva Tarea</h5>
+            <div class="row g-2">
+                <div class="col-md-5">
+                    <input @bind="newTaskTitle" class="form-control" placeholder="Título" />
+                </div>
+                <div class="col-md-5">
+                    <input @bind="newTaskDescription" class="form-control" placeholder="Descripción (opcional)" />
+                </div>
+                <div class="col-md-2">
+                    <button @onclick="CreateTask" class="btn btn-success w-100">Añadir</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (isLoading) // 5. Indicador de carga
+    {
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p>Sincronizando con la base de datos...</p>
+        </div>
+    }
+    else if (tasks != null)
+    {
+        <table class="table table-hover shadow-sm mt-3">
+            <thead class="table-dark">
+                <tr>
+                    <th>Estado</th>
+                    <th>Título</th>
+                    <th>Descripción</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var task in tasks)
+                {
+                    <tr class="@(task.Status == TaskMaster.CLI.Models.TaskStatus.Completed ? "table-light opacity-75" : "")">
+                        <td>
+                            <span class="badge @(task.Status == TaskMaster.CLI.Models.TaskStatus.Completed ? "bg-success" : "bg-warning")">
+                                @task.Status
+                            </span>
+                        </td>
+                        <td class="@(task.Status == TaskMaster.CLI.Models.TaskStatus.Completed ? "text-decoration-line-through text-muted" : "fw-bold")">
+                            @task.Title
+                        </td>
+                        <td>@task.Description</td>
+                        <td>
+                            @if (task.Status != TaskMaster.CLI.Models.TaskStatus.Completed)
+                            {
+                                <button @onclick="() => CompleteTask(task.Id)" class="btn btn-outline-primary btn-sm">
+                                    ✓ Completar
+                                </button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
 
 @code {
     private IEnumerable<TaskItem>? tasks;
+    private bool isLoading = true;
+    private string newTaskTitle = "";
+    private string newTaskDescription = "";
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnInitializedAsync() => await LoadTasks();
+
+    private async Task LoadTasks() // 4. Refresco automático
     {
-        // Recuperar el token del almacenamiento local
+        isLoading = true;
         var token = await localStorage.GetItemAsync<string>("authToken");
 
         if (string.IsNullOrEmpty(token))
@@ -35,14 +90,39 @@ else
             return;
         }
 
-        // Adjuntar el token a la cabecera de autorización
-        Http.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+        Http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
 
         try
         {
             tasks = await Http.GetFromJsonAsync<IEnumerable<TaskItem>>("api/tasks");
         }
-        catch { /* Manejar error */ }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task CreateTask() // 3. POST /api/tasks
+    {
+        if (string.IsNullOrWhiteSpace(newTaskTitle)) return;
+
+        var newTask = new { Title = newTaskTitle, Description = newTaskDescription };
+        var response = await Http.PostAsJsonAsync("api/tasks", newTask);
+
+        if (response.IsSuccessStatusCode)
+        {
+            newTaskTitle = "";
+            newTaskDescription = "";
+            await LoadTasks(); // Refrescar lista
+        }
+    }
+
+    private async Task CompleteTask(Guid id) // 2. PUT /api/tasks/{id}/complete
+    {
+        var response = await Http.PutAsync($"api/tasks/{id}/complete", null);
+        if (response.IsSuccessStatusCode)
+        {
+            await LoadTasks(); // Refrescar lista
+        }
     }
 }
