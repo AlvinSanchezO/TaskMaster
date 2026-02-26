@@ -1,5 +1,8 @@
 ﻿@page "/tasks"
 @using TaskMaster.CLI.Models
+@using Blazored.LocalStorage
+@inject ILocalStorageService localStorage
+@inject NavigationManager Navigation
 @inject HttpClient Http
 
 <h3>Mis Tareas</h3>
@@ -19,18 +22,27 @@ else
 }
 
 @code {
-    private TaskItem[]? tasks;
+    private IEnumerable<TaskItem>? tasks;
 
     protected override async Task OnInitializedAsync()
     {
-        try 
+        // Recuperar el token del almacenamiento local
+        var token = await localStorage.GetItemAsync<string>("authToken");
+
+        if (string.IsNullOrEmpty(token))
         {
-            // Nota: Esto fallará con 401 hasta que implementemos el Login en Blazor
-            tasks = await Http.GetFromJsonAsync<TaskItem[]>("api/tasks");
+            Navigation.NavigateTo("/login");
+            return;
         }
-        catch (Exception ex)
+
+        // Adjuntar el token a la cabecera de autorización
+        Http.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+        try
         {
-            Console.WriteLine($"Error al obtener tareas: {ex.Message}");
+            tasks = await Http.GetFromJsonAsync<IEnumerable<TaskItem>>("api/tasks");
         }
+        catch { /* Manejar error */ }
     }
 }
