@@ -1,13 +1,22 @@
 ﻿@page "/login"
 @using Blazored.LocalStorage
+@using Microsoft.AspNetCore.WebUtilities
 @inject HttpClient Http
 @inject ILocalStorageService localStorage
 @inject NavigationManager Navigation
+
 
 <div class="container mt-5" style="max-width: 400px;">
     <div class="card shadow">
         <div class="card-body">
             <h3 class="text-center">Iniciar Sesión</h3>
+
+            @if (showSuccessMessage)
+            {
+                <div class="alert alert-success border-0 text-center">
+                    🎉 ¡Registro exitoso! Ya puedes entrar.
+                </div>
+            }
 
             <EditForm Model="@loginModel" OnValidSubmit="HandleLogin">
                 <div class="mb-3">
@@ -25,6 +34,11 @@
                 }
 
                 <button type="submit" class="btn btn-primary w-100">Entrar</button>
+
+                <div class="mt-4 text-center">
+                    <span class="text-muted">¿Eres nuevo aquí?</span>
+                    <a href="/register" class="fw-bold text-primary">Crea una cuenta gratis</a>
+                </div>
             </EditForm>
         </div>
     </div>
@@ -33,11 +47,23 @@
 @code {
     private LoginRequest loginModel = new();
     private string? errorMessage;
+    private bool showSuccessMessage = false;
+
+    protected override void OnInitialized()
+    {
+        var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+        // Ahora QueryHelpers será reconocido correctamente
+        if (QueryHelpers.ParseQuery(uri.Query).TryGetValue("registered", out var value))
+        {
+            showSuccessMessage = value == "true";
+        }
+    }
 
     private async Task HandleLogin()
     {
         errorMessage = null;
-        // 2. POST a /api/auth/login
+        showSuccessMessage = false;
+
         var response = await Http.PostAsJsonAsync("api/auth/login", loginModel);
 
         if (response.IsSuccessStatusCode)
@@ -45,14 +71,12 @@
             var result = await response.Content.ReadFromJsonAsync<LoginResponse>();
             if (result != null)
             {
-                // 4. Guardar token y redireccionar
                 await localStorage.SetItemAsync("authToken", result.Token);
                 Navigation.NavigateTo("/tasks");
             }
         }
         else
         {
-            // 5. Mostrar mensaje de error
             errorMessage = "Credenciales incorrectas. Intenta de nuevo.";
         }
     }
