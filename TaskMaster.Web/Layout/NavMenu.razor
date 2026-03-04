@@ -1,9 +1,10 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
+﻿@using Blazored.LocalStorage
+@inject ILocalStorageService localStorage
+@inject NavigationManager NavigationManager
+
+<div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
-        <a class="navbar-brand" href="">TaskMaster.Web</a>
-        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
-            <span class="navbar-toggler-icon"></span>
-        </button>
+        <a class="navbar-brand" href="">TaskMaster</a>
     </div>
 </div>
 
@@ -11,29 +12,46 @@
     <nav class="nav flex-column">
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
+                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Inicio
             </NavLink>
         </div>
+
+        @* 1. Enlace a Mis Tareas *@
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="counter">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Counter
+            <NavLink class="nav-link" href="tasks">
+                <span class="bi bi-list-check-nav-menu" aria-hidden="true"></span> Mis Tareas
             </NavLink>
         </div>
+
+        @* 2. Enlace a Categorías *@
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="weather">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Weather
+            <NavLink class="nav-link" href="categories">
+                <span class="bi bi-tags-fill-nav-menu" aria-hidden="true"></span> Categorías
             </NavLink>
+        </div>
+
+        @* 3. Botón de Logout al final *@
+        <div class="nav-item px-3 mt-4">
+            <button class="nav-link btn btn-link text-start w-100 border-0" @onclick="HandleLogout">
+                <span class="bi bi-door-open-fill-nav-menu" aria-hidden="true"></span> Cerrar Sesión
+            </button>
         </div>
     </nav>
 </div>
 
 @code {
     private bool collapseNavMenu = true;
-
     private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
 
     private void ToggleNavMenu()
     {
         collapseNavMenu = !collapseNavMenu;
+    }
+
+    // Lógica para cerrar sesión
+    private async Task HandleLogout()
+    {
+        await localStorage.RemoveItemAsync("authToken"); // Borra el token
+        NavigationManager.NavigateTo("/login"); // Redirige al login
     }
 }
