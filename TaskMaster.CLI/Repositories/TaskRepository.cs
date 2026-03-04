@@ -1,4 +1,5 @@
-﻿using TaskMaster.CLI.Data;
+﻿using Microsoft.EntityFrameworkCore;
+using TaskMaster.CLI.Data;
 using TaskMaster.CLI.Interfaces;
 using TaskMaster.CLI.Models;
 using MyTaskStatus = TaskMaster.CLI.Models.TaskStatus;
@@ -27,7 +28,11 @@ public class TaskRepository : ITaskRepository
 
     public List<TaskItem> GetAllTasks()
     {
-        return _context.Tasks.OrderBy(t => t.CreatedAt).ToList();
+        // Usamos .Include para traer la data de la categoría junto con la tarea
+        return _context.Tasks
+            .Include(t => t.Category)
+            .OrderBy(t => t.CreatedAt)
+            .ToList();
     }
 
     // Método auxiliar para buscar por ID completo o parcial

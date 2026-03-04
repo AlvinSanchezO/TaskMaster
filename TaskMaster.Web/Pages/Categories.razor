@@ -1,0 +1,68 @@
+﻿@page "/categories"
+@using TaskMaster.CLI.Models
+@using Blazored.LocalStorage
+@inject ILocalStorageService localStorage
+@inject HttpClient Http
+
+<div class="container mt-4">
+    <h3>Gestión de Categorías</h3>
+
+    <div class="card mb-4 shadow-sm border-info">
+        <div class="card-body">
+            <h5 class="text-info">Lista de Categorías Disponibles</h5>
+            @if (categories == null)
+            {
+                <p>Cargando categorías...</p>
+            }
+            else if (!categories.Any())
+            {
+                <p class="text-muted">No has creado categorías todavía.</p>
+            }
+            else
+            {
+                <table class="table table-hover mt-3">
+                    <thead class="table-primary">
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Color Representativo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var cat in categories)
+                        {
+                            <tr>
+                                <td>@cat.Name</td>
+                                <td>
+                                    <div style="width: 50px; height: 20px; background-color: @cat.ColorHex; border-radius: 4px;"></div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<Category>? categories;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCategories();
+    }
+
+    private async Task LoadCategories()
+    {
+        try
+        {
+            var token = await localStorage.GetItemAsync<string>("authToken");
+            Http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            categories = await Http.GetFromJsonAsync<List<Category>>("api/categories");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+    }
+}

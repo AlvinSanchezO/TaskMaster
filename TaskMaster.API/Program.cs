@@ -8,14 +8,22 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-//REGISTRO DE SERVICIOS 
+// --- REGISTRO DE SERVICIOS ---
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-//CONFIGURACIÓN DE CORS 
+// CONFIGURACIÓN PARA EVITAR BUCLES INFINITOS EN JSON (Solución al Error 500)
+// Esto evita que el serializador falle al procesar la relación Tarea <-> Categoría
+builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =>
+{
+    options.SerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+});
+
+// CONFIGURACIÓN DE CORS
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowBlazor", policy =>
@@ -55,21 +63,19 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-//PIPELINE
+// --- PIPELINE ---
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
-//ACTIVAR CORS 
 app.UseCors("AllowBlazor");
-
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 
-//ENDPOINTS DE AUTENTICACIÓN
+// --- ENDPOINTS DE AUTENTICACIÓN ---
 
 app.MapPost("/api/auth/register", (UserAuthRequest req, UserService userService) =>
 {
@@ -104,7 +110,26 @@ app.MapPost("/api/auth/login", (UserAuthRequest req, UserService userService, IC
 })
 .WithName("Login");
 
-//ENDPOINTS DE TAREAS (PROTEGIDOS POR JWT) 
+// --- ENDPOINTS DE CATEGORÍAS ---
+
+app.MapGet("/api/categories", (AppDbContext db) =>
+{
+    return Results.Ok(db.Categories.ToList());
+})
+.WithName("GetCategories").RequireAuthorization();
+
+app.MapPost("/api/categories", (Category category, AppDbContext db) =>
+{
+    if (string.IsNullOrWhiteSpace(category.Name)) return Results.BadRequest();
+
+    db.Categories.Add(category);
+    db.SaveChanges();
+    return Results.Created($"/api/categories/{category.Id}", category);
+})
+.WithName("CreateCategory").RequireAuthorization();
+
+
+// --- ENDPOINTS DE TAREAS ---
 
 app.MapGet("/api/tasks", (ITaskRepository repo, ClaimsPrincipal user) =>
 {
@@ -112,11 +137,15 @@ app.MapGet("/api/tasks", (ITaskRepository repo, ClaimsPrincipal user) =>
     if (userIdStr == null) return Results.Unauthorized();
 
     var currentUserId = Guid.Parse(userIdStr);
-    var myTasks = repo.GetAllTasks().Where(t => t.UserId == currentUserId);
+
+    // Obtenemos las tareas filtradas por el usuario actual
+    var myTasks = repo.GetAllTasks()
+        .Where(t => t.UserId == currentUserId)
+        .ToList();
+
     return Results.Ok(myTasks);
 })
-.WithName("GetTasks")
-.RequireAuthorization();
+.WithName("GetTasks").RequireAuthorization();
 
 app.MapPost("/api/tasks", (CreateTaskRequest input, ITaskRepository repo, ClaimsPrincipal user) =>
 {
@@ -124,13 +153,17 @@ app.MapPost("/api/tasks", (CreateTaskRequest input, ITaskRepository repo, Claims
     if (userIdStr == null) return Results.Unauthorized();
 
     var currentUserId = Guid.Parse(userIdStr);
-    var newTask = new TaskItem(input.Title, input.Description ?? "", currentUserId);
+
+    // Creamos la tarea vinculando el CategoryId enviado desde el Dashboard
+    var newTask = new TaskItem(input.Title, input.Description ?? "", currentUserId)
+    {
+        CategoryId = input.CategoryId
+    };
 
     repo.AddTask(newTask);
     return Results.Created($"/api/tasks/{newTask.Id}", newTask);
 })
-.WithName("CreateTask")
-.RequireAuthorization();
+.WithName("CreateTask").RequireAuthorization();
 
 app.MapPut("/api/tasks/{id}/complete", (Guid id, ITaskRepository repo, ClaimsPrincipal user) =>
 {
@@ -145,8 +178,7 @@ app.MapPut("/api/tasks/{id}/complete", (Guid id, ITaskRepository repo, ClaimsPri
     var success = repo.UpdateTaskStatus(id.ToString(), TaskMaster.CLI.Models.TaskStatus.Completed);
     return success ? Results.NoContent() : Results.NotFound();
 })
-.WithName("CompleteTask")
-.RequireAuthorization();
+.WithName("CompleteTask").RequireAuthorization();
 
 app.MapDelete("/api/tasks/{id}", (Guid id, ITaskRepository repo, ClaimsPrincipal user) =>
 {
@@ -161,10 +193,10 @@ app.MapDelete("/api/tasks/{id}", (Guid id, ITaskRepository repo, ClaimsPrincipal
     var success = repo.DeleteTask(id.ToString());
     return success ? Results.NoContent() : Results.NotFound();
 })
-.WithName("DeleteTask")
-.RequireAuthorization();
+.WithName("DeleteTask").RequireAuthorization();
 
 app.Run();
 
-record CreateTaskRequest(string Title, string? Description);
+// --- DTOs ---
+record CreateTaskRequest(string Title, string? Description, Guid? CategoryId);
 record UserAuthRequest(string Username, string Password);
